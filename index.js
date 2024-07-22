@@ -26,54 +26,86 @@ let db = async() => {
 }
 db();
 
-app.get('/',(req,res) => {  
-    console.log(" A new request has been raised on  " + new Date(Date.now())); 
-    res.writeHead(200,{ 'Content-Type':"text/plain"})  
-    res.write(' hey');
-    res.end();
-});
-const userSchema = new mongoose.Schema({ 
-    Name: { 
-        type: String, 
-        require: true
-    }, 
-    value: {
-        type: String,
-        require:true
+const userSchema = new mongoose.Schema({
+    email: {
+      type: String,
+      required: true,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    name:{
+        type:String,
+        required: true,
     }
-}) 
+  });
   
-const Users = new mongoose.model("user", userSchema)
-
-app.get('/users',async (request,response) => { 
-    const allUsers = await Users.find({});
+  const Users = new mongoose.model('User', userSchema);
+  
+  app.post('/login', async (request, response) => {
+    const { email, password,name } = request.body;
+  
     try {
-      response.send(allUsers);
+      // Find user by email
+      const user = await Users.findOne({ email });
+      
+      if (user) {
+        // Compare hashed password
+        //const isPasswordValid = await bcrypt.compare(password, user.password);
+  
+        if (password === user.password) {
+          response.json({ success: true, message: 'Login successful' });
+        } else {
+          response.status(401).json({ success: false, message: 'Invalid ' });
+        }
+      } else {
+        response.status(401).json({ success: false, message: 'Invalid credentials' });
+      }
     } catch (error) {
-      response.status(500).send(error);
+      response.status(500).send(error.message);
     }
-});
-//
+  });
+  
+  
+
+  app.post('/signup',async(request, response)=>{
+    const { email, password,name } = request.body;
+    try{
+        const user = await Users.findOne({ email });
+        if(user){
+            response.status(401).json({ success: false, message: 'Email is already in use.' });
+        }else{
+            const user=new Users({email,password,name});
+            await user.save();
+            response.send({ success: true, message: 'Login successful' });
+        }
+    }catch (error) {
+        response.status(500).send(error.message);
+      }
+  });
+
+
+
+
+
+
 const Q_A = new mongoose.Schema({question:String,answer:[String]});
-const userSchema001 = new mongoose.Schema({
-    theft_or_robbery_faqs:[Q_A],
+const criminalSchema = new mongoose.Schema({
+    constitutional_related_faqs:[Q_A],
 });
 
-const Criminal = new mongoose.model("criminal", userSchema001)
-
-const database = mongoose.connection;
+const Criminal = new mongoose.model("criminal", criminalSchema)
 
 app.get('/crime',async (request,response) => { 
+    const allconst = await Criminal.find();
     try {
-    const criminalCollection = database.collection('criminal')
-    const criminaldata = await criminalCollection.find({}).toArray();
-    console.log(criminaldata)
-      response.json(criminaldata);
-    } catch (error) {
+      response.send(allconst[0]);   
+    } catch (error) {       
       response.status(500).send(error);
     }
 });
-//
+
 //To check the user
 app.post("/login", getFields.none(), async (request, response) => {
     console.log(request.body);
@@ -87,6 +119,56 @@ app.post("/login", getFields.none(), async (request, response) => {
     } catch (error) {
         response.status(500).send(error);
     }
+});
+
+// Connect to MongoDB
+mongoose.connect('mongodb://localhost:27017/nyaaysahaayak', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  console.log('Connected to MongoDB');
+  // Start the server after successfully connecting to MongoDB
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+})
+.catch(error => {
+  console.error('Error connecting to MongoDB:', error);
+});
+
+// Define mongoose schema
+const submissionSchema = new mongoose.Schema({
+  fullName: String,
+  mobileNumber: String,
+  appointmentDate: Date,
+  message: String,
+});
+
+// Create mongoose model
+const Submission = mongoose.model('Submission', submissionSchema);
+
+// Endpoint to handle form submissions
+app.post('/submissions', async (req, res) => {
+  try {
+    const { fullName, mobileNumber, appointmentDate, message } = req.body;
+    
+    // Create a new submission instance
+    const submission = new Submission({
+      fullName,
+      mobileNumber,
+      appointmentDate,
+      message,
+    });
+
+    // Save the submission to the database
+    await submission.save();
+
+    res.status(201).json({ message: 'Submission successful' });
+  } catch (error) {
+    console.error('Error saving submission:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 
